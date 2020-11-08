@@ -1,7 +1,9 @@
 defmodule NervesSystemRpi0Zbar.MixProject do
   use Mix.Project
 
+  @github_organization "ejc123"
   @app :nerves_system_rpi0_zbar
+  @source_url "https://github.com/#{@github_organization}/#{@app}"
   @version Path.join(__DIR__, "VERSION")
            |> File.read!()
            |> String.trim()
@@ -17,7 +19,12 @@ defmodule NervesSystemRpi0Zbar.MixProject do
       package: package(),
       deps: deps(),
       aliases: [loadconfig: [&bootstrap/1], docs: ["docs", &copy_images/1]],
-      docs: [extras: ["README.md"], main: "readme"]
+      docs: docs(),
+      preferred_cli_env: %{
+        docs: :docs,
+        "hex.build": :docs,
+        "hex.publish": :docs
+      }
     ]
   end
 
@@ -26,7 +33,7 @@ defmodule NervesSystemRpi0Zbar.MixProject do
   end
 
   defp bootstrap(args) do
-    System.put_env("MIX_TARGET", "rpi0")
+    set_target()
     Application.start(:nerves_bootstrap)
     Mix.Task.run("loadconfig", args)
   end
@@ -35,7 +42,7 @@ defmodule NervesSystemRpi0Zbar.MixProject do
     [
       type: :system,
       artifact_sites: [
-        {:github_releases, "ejc123/#{@app}"}
+        {:github_releases, "#{@github_organization}/#{@app}"}
       ],
       build_runner_opts: build_runner_opts(),
       platform: Nerves.System.BR,
@@ -48,11 +55,11 @@ defmodule NervesSystemRpi0Zbar.MixProject do
 
   defp deps do
     [
-      {:nerves, "~> 1.3", runtime: false},
-      {:nerves_system_br, "1.6.2", runtime: false},
-      {:nerves_toolchain_armv6_rpi_linux_gnueabi, "1.1.0", runtime: false},
-      {:nerves_system_linter, "~> 0.3.0", runtime: false},
-      {:ex_doc, "~> 0.18", only: [:dev, :test], runtime: false}
+      {:nerves, "~> 1.5.4 or ~> 1.6.0 or ~> 1.7.0", runtime: false},
+      {:nerves_system_br, "1.13.2", runtime: false},
+      {:nerves_toolchain_armv6_rpi_linux_gnueabi, "~> 1.3.0", runtime: false},
+      {:nerves_system_linter, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.22", only: :docs, runtime: false}
     ]
   end
 
@@ -62,12 +69,21 @@ defmodule NervesSystemRpi0Zbar.MixProject do
     """
   end
 
+  defp docs do
+    [
+      extras: ["README.md", "CHANGELOG.md"],
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
+    ]
+  end
+
   defp package do
     [
-      maintainers: ["Eric J. Christeson"],
       files: package_files(),
       licenses: ["Apache 2.0"],
-      links: %{"Github" => "https://github.com/ejc123/#{@app}"}
+      links: %{"GitHub" => @source_url}
     ]
   end
 
@@ -81,11 +97,12 @@ defmodule NervesSystemRpi0Zbar.MixProject do
       "fwup-revert.conf",
       "fwup.conf",
       "LICENSE",
-      "linux-4.14.defconfig",
+      "linux-4.19.defconfig",
       "mix.exs",
       "nerves_defconfig",
       "post-build.sh",
       "post-createfs.sh",
+      "ramoops.dts",
       "README.md",
       "VERSION"
     ]
@@ -101,6 +118,14 @@ defmodule NervesSystemRpi0Zbar.MixProject do
       [make_args: ["BR2_PRIMARY_SITE=#{primary_site}"]]
     else
       []
+    end
+  end
+
+  defp set_target() do
+    if function_exported?(Mix, :target, 1) do
+      apply(Mix, :target, [:target])
+    else
+      System.put_env("MIX_TARGET", "target")
     end
   end
 end

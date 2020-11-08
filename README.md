@@ -20,9 +20,9 @@ appropriate for your setup.
 | CPU                  | 1 GHz ARM1176JZF-S              |
 | Memory               | 512 MB                          |
 | Storage              | MicroSD                         |
-| Linux kernel         | 4.14 w/ Raspberry Pi patches    |
-| IEx terminal         | OTG USB serial port (`ttyGS0`). Can be changed to HDMI or UART. |
-| GPIO, I2C, SPI       | Yes - Elixir ALE                |
+| Linux kernel         | 4.19 w/ Raspberry Pi patches    |
+| IEx terminal         | UART `ttyAMA0` Can be changed to HDMI |
+| GPIO, I2C, SPI       | Yes - [Elixir Circuits](https://github.com/elixir-circuits) |
 | ADC                  | No                              |
 | PWM                  | Yes, but no Elixir support      |
 | UART                 | 1 available - `ttyAMA0`         |
@@ -43,36 +43,36 @@ If you need custom modifications to this system for your device, clone this
 repository and update as described in [Making custom
 systems](https://hexdocs.pm/nerves/systems.html#customizing-your-own-nerves-system)
 
-If you're new to Nerves, check out the
-[nerves_init_gadget](https://github.com/nerves-project/nerves_init_gadget)
-project for creating a starter project for the Raspberry Pi Zero or Zero W. It
-will get you started with the basics like bringing up the virtual Ethernet
-interface, initializing the writable application data partition, and enabling
-ssh-based firmware updates.
+## USB OTG support
+
+One of the goals of this system is to make it possible to do most development
+via one USB cable. That cable, when plugged into the USB OTG port, powers the
+Raspberry Pi Zero and provides local networking. Via the network connection, one
+can access an IEx prompt via ssh, transfer files via sftp, run firmware updates,
+use Erlang distribution and anything else that works over IP.
+
+IMPORTANT: The Raspberry Pi Zero has two USB ports. The OTG one is the "middle"
+one. The other one is power-only.
+
+When you connect the USB OTG port to your laptop, it should "just" work if
+you're using OSX or Linux. If you're on Windows and want to access networking
+natively (not through a Linux VM), you will need to install
+[`linux.inf`](https://elixir.bootlin.com/linux/v4.19.102/source/Documentation/usb/linux.inf).
+This file is unsigned and will fail to install unless you disable signed driver
+enforcement. The basic idea is to go to settings, go to the advanced boot
+settings and navigate the menus to boot with it off. There are examples on the
+web.
 
 ## Console and kernel message configuration
 
-The goal of this image is to use the OTG port for console access. If you're
-debugging the boot process, you'll want to use the Raspberry Pi's UART pins on
-the GPIO connector or the HDMI output. This is enabled by updating the
-`cmdline.txt` file. This may be overridden with a custom `fwup.conf` file if you
-don't want to rebuild this system. Add the following to your `cmdline.txt`:
+If you're debugging networking or the boot process, you'll want to use the
+Raspberry Pi's UART pins on the GPIO connector (the HDMI output can be made to
+work, but won't be a good development experience).
 
-```text
-console=ttyAMA0,115200 console=tty1 ...
-```
-
-If you'd like the IEx prompt to come out the UART pins (`ttyAMA0`) or HDMI
-(`tty1`), then modify `rootfs_overlay/etc/erlinit.config` as well.
-
-## Supported OTG USB modes
-
-The base image activates the `dwc2` overlay, which allows the Pi Zero to appear
-as a device (aka gadget mode). When plugged into a host computer via the OTG
-port, the Pi Zero will appear as a composite Ethernet and serial device. The
-virtual serial port provides access to the IEx prompt and the Ethernet device
-can be used for firmware updates, Erlang distribution, and anything else running
-over IP.
+You will need to use a USB-to-UART adapter and connect it to the UART pins on
+the Raspberry Pi's GPIO header. Make sure to use a USB-to-UART adapter with 3.3V
+logic levels. This is most of them and to make things confusing, most adapters
+can supply 5V. Just don't connect the 5V wire.
 
 ## Supported WiFi devices
 
@@ -89,15 +89,15 @@ output.
 To try it out, run:
 
 ```elixir
-:os.cmd('espeak -ven+f5 -k5 -w /tmp/out.wav Hello')
-:os.cmd('aplay -q /tmp/out.wav')
+cmd("espeak -ven+f5 -k5 -w /tmp/out.wav Hello")
+cmd("aplay -q /tmp/out.wav")
 ```
 
 The general Raspberry Pi audio documentation mostly applies to Nerves. For
 example, to force audio out the HDMI port, run:
 
 ```elixir
-:os.cmd('amixer cset numid=3 2')
+cmd("amixer cset numid=3 2")
 ```
 
 Change the last argument to `amixer` to `1` to output to the stereo output jack.
@@ -157,14 +157,6 @@ the Linux kernel to avoid any issues. Unfortunately, none of these are tagged by
 the Raspberry Pi Foundation so I either attempt to match what's in Raspbian or
 take versions of the repositories that have similar commit times.
 
-## Installation
-
-If you're new to Nerves, check out the
-[nerves_init_gadget](https://github.com/fhunleth/nerves_init_gadget) project for
-creating a starter project for the Raspberry Pi Zero or Zero W. It will get you
-started with the basics like bringing up the virtual Ethernet interface,
-initializing the application partition, and enabling ssh-based firmware updates.
-
 ## Linux kernel configuration notes
 
 The Linux kernel compiled for Nerves is a stripped down version of the default
@@ -220,7 +212,7 @@ configuration found here, do the following (this is somewhat tedious):
     type (i.e., no Mac partition support, etc.).
 1. In `Enable loadable module support`, select "Trim unused exported kernel
     symbols". NOTE: If you're having trouble with an out-of-tree kernel module
-    build, try deslecting this!!
+    build, try deselecting this!!
 1. In `General Setup`, turn off `initramfs/initfd` support, Kernel .config
    support, OProfile.
 1. In `Device Drivers -> I2C -> Hardware Bus Support` compile the module into
